@@ -3,6 +3,7 @@
 
 #nullable disable
 
+using System.Collections.Generic;
 using System.Diagnostics;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
@@ -34,6 +35,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private readonly Bindable<bool> configTimingBasedNoteColouring = new Bindable<bool>();
 
+        private readonly Dictionary<int, IBindable<string>> configColourOverrides = new Dictionary<int, IBindable<string>>();
+
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
 
         private Drawable headPiece;
@@ -53,6 +56,14 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
         private void load(ManiaRulesetConfigManager rulesetConfig)
         {
             rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedNoteColouring, configTimingBasedNoteColouring);
+
+            foreach (int divisor in ManiaTimingColourDivisors.All)
+            {
+                var bindable = new Bindable<string>();
+                rulesetConfig?.BindWith(ManiaTimingColourDivisors.SettingFor(divisor), bindable);
+                bindable.BindValueChanged(_ => updateSnapColour());
+                configColourOverrides[divisor] = bindable;
+            }
 
             AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
@@ -129,7 +140,16 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             int snapDivisor = beatmap.ControlPointInfo.GetClosestBeatDivisor(HitObject.StartTime);
 
-            Colour = configTimingBasedNoteColouring.Value ? BindableBeatDivisor.GetColourFor(snapDivisor, colours) : Color4.White;
+            if (!configTimingBasedNoteColouring.Value)
+            {
+                Colour = Color4.White;
+                return;
+            }
+
+            if (configColourOverrides.TryGetValue(snapDivisor, out var bindable) && Colour4.TryParseHex(bindable.Value, out Colour4 overrideColour))
+                Colour = overrideColour;
+            else
+                Colour = BindableBeatDivisor.GetColourFor(snapDivisor, colours);
         }
     }
 }

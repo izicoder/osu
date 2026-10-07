@@ -6,11 +6,13 @@ using System.Linq;
 using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
+using osu.Game.Screens.Edit;
 
 namespace osu.Game.Rulesets.Mania
 {
@@ -20,6 +22,9 @@ namespace osu.Game.Rulesets.Mania
             : base(ruleset)
         {
         }
+
+        [Resolved]
+        private OsuColour colours { get; set; } = null!;
 
         [BackgroundDependencyLoader]
         private void load()
@@ -49,6 +54,22 @@ namespace osu.Game.Rulesets.Mania
                     Keywords = new[] { "color" },
                 },
             };
+
+            // Input boxes to customise the timing-based note colouring per beat divisor.
+            foreach (int divisor in ManiaTimingColourDivisors.All)
+            {
+                var colour = BindableBeatDivisor.GetColourFor(divisor, colours);
+
+                Add(new SettingsItemV2(new FormTextBox
+                {
+                    Caption = RulesetSettingsStrings.TimingBasedColourOverride(divisor),
+                    PlaceholderText = new Colour4(colour.R, colour.G, colour.B, colour.A).ToHex(),
+                    Current = config.GetBindable<string>(ManiaTimingColourDivisors.SettingFor(divisor)),
+                })
+                {
+                    Keywords = new[] { "color", "colour", "hex" },
+                });
+            }
 
             Add(new SettingsItemV2(new FormCheckBox
             {

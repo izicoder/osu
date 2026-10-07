@@ -80,6 +80,11 @@ namespace osu.Game.Localisation
         public static LocalisableString TimingBasedColouring => new TranslatableString(getKey(@"Timing_based_colouring"), @"Timing-based note colouring");
 
         /// <summary>
+        /// "1/4 colour"
+        /// </summary>
+        public static LocalisableString TimingBasedColourOverride(int divisor) => new TranslatableString(getKey($@"Timing_based_colour_override_{divisor}"), @$"1/{divisor} colour");
+
+        /// <summary>
         /// "Rate-adjusted hit animations"
         /// </summary>
         public static LocalisableString RateAdjustedHitAnimation => new TranslatableString(getKey(@"rate_adjusted_hit_animation"), @"Rate-adjusted hit animations");
