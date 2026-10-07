@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using osuTK;
 using osu.Framework.Allocation;
 using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Extensions.Color4Extensions;
 using osu.Framework.Graphics;
 using osu.Framework.Graphics.Containers;
@@ -48,6 +49,7 @@ namespace osu.Game.Overlays
         public const float WIDTH = sidebar_width + PANEL_WIDTH;
 
         protected Container<Drawable> ContentContainer;
+        private PopoverContainer popoverContainer;
 
         protected override Container<Drawable> Content => ContentContainer;
 
@@ -107,7 +109,7 @@ namespace osu.Game.Overlays
                 }
             };
 
-            Add(new PopoverContainer
+            Add(popoverContainer = new PopoverContainer
             {
                 RelativeSizeAxes = Axes.Both,
                 Child = SectionsContainer = new SettingsSectionsContainer
@@ -209,6 +211,14 @@ namespace osu.Game.Overlays
         {
             SearchTextBox.TakeFocus();
             base.OnFocus(e);
+        }
+
+        protected override bool OnMouseDown(MouseDownEvent e)
+        {
+            // PopoverContainer is hosted inside the content panel, so it cannot see clicks on
+            // the sidebar. Dismiss any active popover here before the sidebar handles the click.
+            popoverContainer?.HidePopover();
+            return base.OnMouseDown(e);
         }
 
         protected override void UpdateAfterChildren()
