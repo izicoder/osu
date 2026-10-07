@@ -133,6 +133,19 @@ namespace osu.Game.Rulesets.Mania
             private bool updatingFromCurrent;
 
             /// <summary>
+            /// A frame-delayed mirror of the current popover's visibility. This lets <see cref="OnMouseDown" />
+            /// know whether a popover was visible just before the current mousedown, as the hosting
+            /// <see cref="PopoverContainer" /> dismisses popovers on mouse down (before this control's click fires).
+            /// </summary>
+            private bool popoverVisible;
+
+            /// <summary>
+            /// True when the next click is for hiding the popover (i.e. the popover was visible at mousedown
+            /// and has been dismissed by the hosting <see cref="PopoverContainer" /> already).
+            /// </summary>
+            private bool hidingFromClick;
+
+            /// <summary>
             /// Caption describing this control, displayed above the control.
             /// </summary>
             public LocalisableString Caption { get; init; }
@@ -150,7 +163,23 @@ namespace osu.Game.Rulesets.Mania
             public TimingColourPicker(Colour4 defaultColour)
             {
                 this.defaultColour = defaultColour;
-                Action = () => this.ShowPopover();
+                Action = () =>
+                {
+                    // If the popover was visible at mousedown, the hosting PopoverContainer has already
+                    // dismissed it on mouse down. Re-showing here would cause a close/re-open flicker.
+                    if (hidingFromClick)
+                        hidingFromClick = false;
+                    else
+                        this.ShowPopover();
+                };
+            }
+
+            protected override bool OnMouseDown(MouseDownEvent e)
+            {
+                if (popoverVisible)
+                    hidingFromClick = true;
+
+                return base.OnMouseDown(e);
             }
 
             [BackgroundDependencyLoader]
@@ -218,6 +247,15 @@ namespace osu.Game.Rulesets.Mania
 
                     current.Value = e.NewValue.ToHex();
                 });
+
+                // Ensure the popover doesn't linger when the settings panel itself is hidden.
+                // (The hosting PopoverContainer's auto-hide cannot fire once the panel is faded out,
+                // as its children stop updating and the row's own alpha never reaches zero.)
+                this.FindClosestParent<SettingsPanel>()?.State.BindValueChanged(s =>
+                {
+                    if (s.NewValue == Visibility.Hidden)
+                        this.HidePopover();
+                });
             }
 
             private void updateDisplay()
@@ -261,13 +299,22 @@ namespace osu.Game.Rulesets.Mania
                     background.VisualStyle = VisualStyle.Normal;
             }
 
-            public Popover GetPopover() => new OsuPopover(false)
+            public Popover GetPopover()
             {
-                Child = new OsuColourPicker
+                var popover = new OsuPopover(false)
                 {
-                    Current = { BindTarget = pickerCurrent }
-                }
-            };
+                    Child = new OsuColourPicker
+                    {
+                        Current = { BindTarget = pickerCurrent }
+                    }
+                };
+
+                // Update the visibility mirror on the frame *after* any visibility change, so that
+                // OnMouseDown observes the state from before the current mousedown's dismissal.
+                popover.State.BindValueChanged(s => Schedule(() => popoverVisible = s.NewValue == Visibility.Visible), true);
+
+                return popover;
+            }
 
             public event Action? ValueChanged;
 
