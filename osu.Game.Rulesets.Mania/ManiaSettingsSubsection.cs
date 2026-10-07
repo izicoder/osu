@@ -159,7 +159,7 @@ namespace osu.Game.Rulesets.Mania
                 RelativeSizeAxes = Axes.X;
                 AutoSizeAxes = Axes.Y;
 
-                InternalChildren = new Drawable[]
+                AddRangeInternal(new Drawable[]
                 {
                     background = new FormControlBackground(),
                     new FillFlowContainer
@@ -198,7 +198,7 @@ namespace osu.Game.Rulesets.Mania
                             },
                         },
                     },
-                };
+                });
             }
 
             protected override void LoadComplete()
