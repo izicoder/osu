@@ -2,18 +2,30 @@
 // See the LICENCE file in the repository root for full licence text.
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using osu.Framework;
 using osu.Framework.Allocation;
+using osu.Framework.Bindables;
+using osu.Framework.Extensions;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Containers;
+using osu.Framework.Graphics.Cursor;
 using osu.Framework.Graphics.Shapes;
+using osu.Framework.Graphics.UserInterface;
+using osu.Framework.Input.Events;
+using osu.Framework.Localisation;
 using osu.Game.Graphics;
+using osu.Game.Graphics.Containers;
+using osu.Game.Graphics.Sprites;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
+using osu.Game.Overlays;
 using osu.Game.Overlays.Settings;
 using osu.Game.Rulesets.Mania.Configuration;
 using osu.Game.Rulesets.Mania.UI;
 using osu.Game.Screens.Edit;
+using osuTK;
 
 namespace osu.Game.Rulesets.Mania
 {
@@ -56,42 +68,32 @@ namespace osu.Game.Rulesets.Mania
                 },
             };
 
-            // Input boxes to customise the timing-based note colouring per beat divisor.
+            // Colour pickers to customise the timing-based note colouring per beat divisor.
             foreach (int divisor in ManiaTimingColourDivisors.All)
             {
                 var colour = BindableBeatDivisor.GetColourFor(divisor, colours);
                 var current = config.GetBindable<string>(ManiaTimingColourDivisors.SettingFor(divisor));
 
-                var box = new ColourPreviewTextBox(colour)
+                Add(new SettingsItemV2(new TimingColourPicker(colour)
                 {
                     Caption = RulesetSettingsStrings.TimingBasedColourOverride(divisor),
-                    PlaceholderText = new Colour4(colour.R, colour.G, colour.B, colour.A).ToHex(),
                     Current = current,
-                };
-
-                current.BindValueChanged(v => box.UpdateSwatch(v.NewValue), true);
-
-                Add(new SettingsItemV2(box)
+                })
                 {
-                    Keywords = new[] { "color", "colour", "hex" },
+                    Keywords = new[] { "color", "colour" },
                 });
             }
 
             // Colour used for any divisor without its own override.
             var otherCurrent = config.GetBindable<string>(ManiaRulesetSetting.TimingBasedColourOverrideOther);
 
-            var otherBox = new ColourPreviewTextBox(new Colour4(1f, 0f, 0f, 1f))
+            Add(new SettingsItemV2(new TimingColourPicker(new Colour4(1f, 0f, 0f, 1f))
             {
                 Caption = RulesetSettingsStrings.TimingBasedColourOther,
-                PlaceholderText = @"#RRGGBB",
                 Current = otherCurrent,
-            };
-
-            otherCurrent.BindValueChanged(v => otherBox.UpdateSwatch(v.NewValue), true);
-
-            Add(new SettingsItemV2(otherBox)
+            })
             {
-                Keywords = new[] { "color", "colour", "hex" },
+                Keywords = new[] { "color", "colour" },
             });
 
             Add(new SettingsItemV2(new FormCheckBox
@@ -112,29 +114,172 @@ namespace osu.Game.Rulesets.Mania
                 }));
             }
         }
-        private partial class ColourPreviewTextBox : FormTextBox
+
+        /// <summary>
+        /// A form control which opens a colour picker. The value is stored as a hex string (compatible with
+        /// the underlying ruleset configuration), with a fallback colour used while the string is empty or invalid.
+        /// </summary>
+        private partial class TimingColourPicker : OsuClickableContainer, IHasCurrentValue<string>, IFormControl, IHasPopover
         {
-            private readonly Circle swatch;
+            public Bindable<string> Current
+            {
+                get => current.Current;
+                set => current.Current = value;
+            }
+
+            private readonly BindableWithCurrent<string> current = new BindableWithCurrent<string>();
+            private readonly Bindable<Colour4> pickerCurrent = new Bindable<Colour4>(Colour4.White);
+
+            private bool updatingFromCurrent;
+
+            /// <summary>
+            /// Caption describing this control, displayed above the control.
+            /// </summary>
+            public LocalisableString Caption { get; init; }
+
             private readonly Colour4 defaultColour;
 
-            public ColourPreviewTextBox(Colour4 defaultColour)
+            private FormControlBackground background = null!;
+            private FormFieldCaption caption = null!;
+            private Circle swatch = null!;
+            private OsuSpriteText hexCodeText = null!;
+
+            [Resolved]
+            private OverlayColourProvider colourProvider { get; set; } = null!;
+
+            public TimingColourPicker(Colour4 defaultColour)
             {
                 this.defaultColour = defaultColour;
-
-                swatch = new Circle
-                {
-                    Anchor = Anchor.CentreRight,
-                    Origin = Anchor.CentreRight,
-                    Size = new osuTK.Vector2(14),
-                    Margin = new MarginPadding { Left = 5 },
-                };
+                Action = () => this.ShowPopover();
             }
 
             [BackgroundDependencyLoader]
-            private void load() => CaptionContainer.Add(swatch);
+            private void load()
+            {
+                RelativeSizeAxes = Axes.X;
+                AutoSizeAxes = Axes.Y;
 
-            public void UpdateSwatch(string value) =>
-                swatch.Colour = Colour4.TryParseHex(value, out Colour4 colour) ? colour : defaultColour;
+                InternalChildren = new Drawable[]
+                {
+                    background = new FormControlBackground(),
+                    new FillFlowContainer
+                    {
+                        RelativeSizeAxes = Axes.X,
+                        AutoSizeAxes = Axes.Y,
+                        Padding = new MarginPadding(9),
+                        Spacing = new Vector2(0, 4),
+                        Children = new Drawable[]
+                        {
+                            caption = new FormFieldCaption
+                            {
+                                Anchor = Anchor.TopLeft,
+                                Origin = Anchor.TopLeft,
+                                Caption = Caption,
+                            },
+                            new Container
+                            {
+                                RelativeSizeAxes = Axes.X,
+                                Height = 20,
+                                Children = new Drawable[]
+                                {
+                                    swatch = new Circle
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Size = new Vector2(20),
+                                    },
+                                    hexCodeText = new OsuSpriteText
+                                    {
+                                        Anchor = Anchor.CentreLeft,
+                                        Origin = Anchor.CentreLeft,
+                                        Margin = new MarginPadding { Left = 30 },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                };
+            }
+
+            protected override void LoadComplete()
+            {
+                base.LoadComplete();
+
+                current.BindValueChanged(_ =>
+                {
+                    updateDisplay();
+                    ValueChanged?.Invoke();
+                }, true);
+
+                pickerCurrent.BindValueChanged(e =>
+                {
+                    if (updatingFromCurrent || current.Disabled)
+                        return;
+
+                    current.Value = e.NewValue.ToHex();
+                });
+            }
+
+            private void updateDisplay()
+            {
+                updatingFromCurrent = true;
+
+                Colour4 colour = Colour4.TryParseHex(current.Value, out Colour4 parsed) ? parsed : defaultColour;
+
+                swatch.Colour = colour;
+                hexCodeText.Text = colour.ToHex();
+                pickerCurrent.Value = colour;
+
+                updatingFromCurrent = false;
+
+                updateState();
+            }
+
+            protected override bool OnHover(HoverEvent e)
+            {
+                base.OnHover(e);
+                updateState();
+                return true;
+            }
+
+            protected override void OnHoverLost(HoverLostEvent e)
+            {
+                base.OnHoverLost(e);
+                updateState();
+            }
+
+            private void updateState()
+            {
+                caption.Colour = Current.Disabled ? colourProvider.Background1 : colourProvider.Content2;
+                hexCodeText.Colour = Current.Disabled ? colourProvider.Foreground1 : colourProvider.Content1;
+
+                if (Current.Disabled)
+                    background.VisualStyle = VisualStyle.Disabled;
+                else if (IsHovered)
+                    background.VisualStyle = VisualStyle.Hovered;
+                else
+                    background.VisualStyle = VisualStyle.Normal;
+            }
+
+            public Popover GetPopover() => new OsuPopover(false)
+            {
+                Child = new OsuColourPicker
+                {
+                    Current = { BindTarget = pickerCurrent }
+                }
+            };
+
+            public event Action? ValueChanged;
+
+            public bool IsDefault => current.IsDefault;
+
+            public void SetDefault() => current.SetDefault();
+
+            public bool IsDisabled => current.Disabled;
+
+            public IEnumerable<LocalisableString> FilterTerms => new[] { Caption };
+
+            public float MainDrawHeight => DrawHeight;
         }
     }
 }
