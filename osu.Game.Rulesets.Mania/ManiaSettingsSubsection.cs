@@ -6,6 +6,7 @@ using System.Linq;
 using osu.Framework;
 using osu.Framework.Allocation;
 using osu.Framework.Graphics;
+using osu.Framework.Graphics.Shapes;
 using osu.Game.Graphics;
 using osu.Game.Graphics.UserInterfaceV2;
 using osu.Game.Localisation;
@@ -59,17 +60,39 @@ namespace osu.Game.Rulesets.Mania
             foreach (int divisor in ManiaTimingColourDivisors.All)
             {
                 var colour = BindableBeatDivisor.GetColourFor(divisor, colours);
+                var current = config.GetBindable<string>(ManiaTimingColourDivisors.SettingFor(divisor));
 
-                Add(new SettingsItemV2(new FormTextBox
+                var box = new ColourPreviewTextBox(colour)
                 {
                     Caption = RulesetSettingsStrings.TimingBasedColourOverride(divisor),
                     PlaceholderText = new Colour4(colour.R, colour.G, colour.B, colour.A).ToHex(),
-                    Current = config.GetBindable<string>(ManiaTimingColourDivisors.SettingFor(divisor)),
-                })
+                    Current = current,
+                };
+
+                current.BindValueChanged(v => box.UpdateSwatch(v.NewValue), true);
+
+                Add(new SettingsItemV2(box)
                 {
                     Keywords = new[] { "color", "colour", "hex" },
                 });
             }
+
+            // Colour used for any divisor without its own override.
+            var otherCurrent = config.GetBindable<string>(ManiaRulesetSetting.TimingBasedColourOverrideOther);
+
+            var otherBox = new ColourPreviewTextBox(new Colour4(1f, 0f, 0f, 1f))
+            {
+                Caption = RulesetSettingsStrings.TimingBasedColourOther,
+                PlaceholderText = @"#RRGGBB",
+                Current = otherCurrent,
+            };
+
+            otherCurrent.BindValueChanged(v => otherBox.UpdateSwatch(v.NewValue), true);
+
+            Add(new SettingsItemV2(otherBox)
+            {
+                Keywords = new[] { "color", "colour", "hex" },
+            });
 
             Add(new SettingsItemV2(new FormCheckBox
             {
@@ -88,6 +111,30 @@ namespace osu.Game.Rulesets.Mania
 #pragma warning restore CS0618 // Type or member is obsolete
                 }));
             }
+        }
+        private partial class ColourPreviewTextBox : FormTextBox
+        {
+            private readonly Circle swatch;
+            private readonly Colour4 defaultColour;
+
+            public ColourPreviewTextBox(Colour4 defaultColour)
+            {
+                this.defaultColour = defaultColour;
+
+                swatch = new Circle
+                {
+                    Anchor = Anchor.CentreRight,
+                    Origin = Anchor.CentreRight,
+                    Size = new osuTK.Vector2(14),
+                    Margin = new MarginPadding { Left = 5 },
+                };
+            }
+
+            [BackgroundDependencyLoader]
+            private void load() => CaptionContainer.Add(swatch);
+
+            public void UpdateSwatch(string value) =>
+                swatch.Colour = Colour4.TryParseHex(value, out Colour4 colour) ? colour : defaultColour;
         }
     }
 }

@@ -36,6 +36,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
             SetDefault(ManiaRulesetSetting.TimingBasedColourOverride9, string.Empty);
             SetDefault(ManiaRulesetSetting.TimingBasedColourOverride12, string.Empty);
             SetDefault(ManiaRulesetSetting.TimingBasedColourOverride16, string.Empty);
+            SetDefault(ManiaRulesetSetting.TimingBasedColourOverrideOther, string.Empty);
             SetDefault(ManiaRulesetSetting.MobileLayout, ManiaMobileLayout.Portrait);
             SetDefault(ManiaRulesetSetting.TouchOverlay, false);
         }
@@ -105,6 +106,7 @@ namespace osu.Game.Rulesets.Mania.Configuration
         TimingBasedColourOverride9,
         TimingBasedColourOverride12,
         TimingBasedColourOverride16,
+        TimingBasedColourOverrideOther,
         MobileLayout,
         TouchOverlay,
     }

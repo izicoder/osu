@@ -37,6 +37,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
         private readonly Dictionary<int, IBindable<string>> configColourOverrides = new Dictionary<int, IBindable<string>>();
 
+        private readonly Bindable<string> configColourOverrideOther = new Bindable<string>();
+
         protected virtual ManiaSkinComponents Component => ManiaSkinComponents.Note;
 
         private Drawable headPiece;
@@ -64,6 +66,9 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
                 bindable.BindValueChanged(_ => updateSnapColour());
                 configColourOverrides[divisor] = bindable;
             }
+
+            rulesetConfig?.BindWith(ManiaRulesetSetting.TimingBasedColourOverrideOther, configColourOverrideOther);
+            configColourOverrideOther.BindValueChanged(_ => updateSnapColour());
 
             AddInternal(headPiece = new SkinnableDrawable(new ManiaSkinComponentLookup(Component), _ => new DefaultNotePiece())
             {
@@ -148,6 +153,8 @@ namespace osu.Game.Rulesets.Mania.Objects.Drawables
 
             if (configColourOverrides.TryGetValue(snapDivisor, out var bindable) && Colour4.TryParseHex(bindable.Value, out Colour4 overrideColour))
                 Colour = overrideColour;
+            else if (Colour4.TryParseHex(configColourOverrideOther.Value, out Colour4 otherColour))
+                Colour = otherColour;
             else
                 Colour = BindableBeatDivisor.GetColourFor(snapDivisor, colours);
         }

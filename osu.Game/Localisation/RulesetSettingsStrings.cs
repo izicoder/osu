@@ -85,6 +85,11 @@ namespace osu.Game.Localisation
         public static LocalisableString TimingBasedColourOverride(int divisor) => new TranslatableString(getKey($@"Timing_based_colour_override_{divisor}"), @$"1/{divisor} colour");
 
         /// <summary>
+        /// "Other colour"
+        /// </summary>
+        public static LocalisableString TimingBasedColourOther => new TranslatableString(getKey(@"Timing_based_colour_other"), @"Other colour");
+
+        /// <summary>
         /// "Rate-adjusted hit animations"
         /// </summary>
         public static LocalisableString RateAdjustedHitAnimation => new TranslatableString(getKey(@"rate_adjusted_hit_animation"), @"Rate-adjusted hit animations");
